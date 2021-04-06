@@ -246,7 +246,7 @@ class EvoZone(EvoZoneBase, ClimateEntity):
 
     def set_temperature(self, **kwargs) -> None:
         """Set a new target temperature."""
-        self.svc_set_zone_mode(setpoint=kwargs.get(ATTR_TEMPERATURE))
+        self.svc_set_zone_mode(setpoint=kwargs.get(ATTR_TEMPERATURE), mode=ZoneMode.ADVANCED)
 
     def svc_reset_zone_config(self) -> None:
         """Reset the configuration of the Zone."""
