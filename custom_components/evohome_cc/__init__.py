@@ -106,6 +106,8 @@ async def async_setup(hass: HomeAssistantType, hass_config: ConfigType) -> bool:
         await broker.async_update()
     else:
         _LOGGER.warning("The restore client state feature has been disabled.")
+        hass.helpers.event.async_call_later(10, broker.async_update)
+        hass.helpers.event.async_call_later(30, broker.async_update)
 
     hass.helpers.event.async_track_time_interval(
         broker.async_update, hass_config[DOMAIN][CONF_SCAN_INTERVAL]
@@ -249,7 +251,7 @@ class EvoBroker:
         sensors = [
             s
             for s in self.client.devices + [self.client.evo]
-            if any([hasattr(s, a) for a in BINARY_SENSOR_ATTRS])
+            if any(hasattr(s, a) for a in BINARY_SENSOR_ATTRS)
         ]
         return [s for s in sensors if s not in self.binary_sensors]
 
@@ -260,7 +262,7 @@ class EvoBroker:
         sensors = [
             s
             for s in self.client.devices + [self.client.evo]
-            if any([hasattr(s, a) for a in SENSOR_ATTRS])
+            if any(hasattr(s, a) for a in SENSOR_ATTRS)
         ]
         return [s for s in sensors if s not in self.sensors]
 
@@ -276,6 +278,8 @@ class EvoEntity(Entity):
         self._unique_id = self._name = None
         self._entity_state_attrs = ()
 
+        self._req_ha_state_update(delay=5)  # give time to collect entire state
+
     @callback
     def _handle_dispatch(self, *args) -> None:  # TODO: remove as unneeded?
         """Process a dispatched message.
@@ -284,6 +288,12 @@ class EvoEntity(Entity):
         """
         if not args:
             self.async_schedule_update_ha_state()
+
+    def _req_ha_state_update(self, delay=1) -> None:
+        """Update HA state after a short delay to allow system to quiesce."""
+        self._broker.hass.helpers.event.async_call_later(
+            delay, self.async_schedule_update_ha_state
+        )
 
     @property
     def should_poll(self) -> bool:
@@ -321,7 +331,7 @@ class EvoDeviceBase(EvoEntity):
         """Initialize the sensor."""
         super().__init__(broker, device)
 
-        klass = self.DEVICE_CLASS if self.DEVICE_CLASS else self.STATE_ATTR
+        klass = self.DEVICE_CLASS or self.STATE_ATTR
         self._name = f"{device.id} ({klass})"
         # if device.zone:  # not all have this attr
         #     self._name = f"{device.zone.name} ({klass})"
